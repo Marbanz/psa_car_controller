@@ -720,7 +720,9 @@
   battery_power: 0
   fuel_capacity: 52
   abrp_name:
-  reg: VR3FPHNSTP 
+  reg: VR3FPHNSTP
+  max_elec_consumption: 70
+  max_fuel_consumption: 30
 - !CarModel
   name: Citroën e-C3 IV
   battery_power: 44
@@ -748,7 +750,9 @@
   battery_power: 0
   fuel_capacity: 52
   abrp_name:
-  reg: VR3FPHPY0S 
+  reg: VR3FPHPY0S
+  max_elec_consumption: 70
+  max_fuel_consumption: 30
 - !CarModel
   name: SUV 3008 II
   battery_power: 0
@@ -859,13 +863,14 @@
   abrp_name: peugeot:e308:23:54
   reg: VR3FNZKW4R 
   max_elec_consumption: 70
-- !CarModel
+- !ElecModel
   name: E-308 SW 54kWh
   battery_power: 50.8
   fuel_capacity: 0
   abrp_name: peugeot:e308:23:54
   reg: VR3FNZKW9R 
   max_elec_consumption: 70
+  max_fuel_consumption: 0
 - !CarModel
   name: 308 SW GT Hybrid
   battery_power: 12.4
@@ -968,4 +973,11 @@
   reg: VXKUHZKW4S
   max_elec_consumption: 70
   max_fuel_consumption: 0
+- !ElecModel
+  name: Astra L Electric GS
+  battery_power: 51
+  fuel_capacity: 0
+  abrp_name: opel:astrae:22:54:tour
+  reg: VXKFNZKW9S 
+  max_elec_consumption: 70
 
