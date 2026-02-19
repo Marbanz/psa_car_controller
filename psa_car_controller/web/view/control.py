@@ -16,6 +16,7 @@ REFRESH_SWITCH = "refresh-switch"
 ABRP_SWITCH = 'abrp-switch'
 CHARGE_SWITCH = "charge-switch"
 PRECONDITIONING_SWITCH = "preconditioning-switch"
+CONTINUOUS_PRECONDITIONING_SWITCH = "continuous-preconditioning-switch"
 
 
 def convert_value_to_str(value):
@@ -66,7 +67,14 @@ def get_control_tabs(config):
                                         Switch(CHARGE_SWITCH, car.vin, "Charge", myp.remote_client.charge_now,
                                                charging_state).get_html(),
                                         Switch(PRECONDITIONING_SWITCH, car.vin, "Preconditioning",
-                                               myp.remote_client.preconditioning, preconditionning_state).get_html()])
+                                               myp.remote_client.preconditioning, preconditionning_state,
+                                               disabled=myp.remote_client.is_continuous_preconditioning_active(
+                                                   car.vin)).get_html(),
+                                        Switch(CONTINUOUS_PRECONDITIONING_SWITCH, car.vin,
+                                               "Continuous Preconditioning",
+                                               myp.remote_client.continuous_preconditioning,
+                                               myp.remote_client.is_continuous_preconditioning_active(
+                                                   car.vin)).get_html()])
                 except (AttributeError, TypeError):
                     logger.exception("get_control_tabs:")
         if not config.offline:

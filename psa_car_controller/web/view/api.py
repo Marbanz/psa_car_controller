@@ -89,6 +89,13 @@ def preconditioning(vin, activate):
     return jsonify(APP.myp.remote_client.preconditioning(vin, activate))
 
 
+@app.route('/continuous_preconditioning/<string:vin>/<int:activate>')
+def continuous_preconditioning(vin, activate):
+    check_interval_min = int(request.args.get('check_interval_min', 20))
+    APP.myp.remote_client.continuous_preconditioning(vin, bool(activate), check_interval_min)
+    return jsonify({"vin": vin, "continuous_preconditioning": bool(activate), "check_interval_min": check_interval_min})
+
+
 @app.route('/position/<string:vin>')
 def get_position(vin):
     res = APP.myp.get_vehicle_info(vin)

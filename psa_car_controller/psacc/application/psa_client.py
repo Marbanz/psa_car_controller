@@ -78,6 +78,7 @@ class PSAClient:
                                           self.vehicles_list,
                                           self.manager,
                                           remote_credentials)
+        self.remote_client.get_vehicle_info_fn = self.get_vehicle_info
 
     def get_app_name(self):
         return realm_info[self.realm]['app_name']

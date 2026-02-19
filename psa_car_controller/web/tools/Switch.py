@@ -8,9 +8,10 @@ from psa_car_controller.web.tools.Button import Button
 
 
 class Switch(Button):
-    def __init__(self, role, element_id, label, fct, value, prevent_initial_call=True):
+    def __init__(self, role, element_id, label, fct, value, prevent_initial_call=True, disabled=False):
         # pylint: disable=too-many-arguments,too-many-positional-arguments
         self.value = value
+        self.disabled = disabled
         super().__init__(role, element_id, label, fct, prevent_initial_call)
 
     def _set_callback(self, prevent_initial_call):
@@ -21,7 +22,8 @@ class Switch(Button):
         return dbc.Col([daq.ToggleSwitch(  # pylint: disable=not-callable
             id=self.get_button_id(),
             value=self.value,
-            label=self.label
+            label=self.label,
+            disabled=self.disabled
         ), html.Div(id=self.get_response_id())])
 
     def call(self, value):

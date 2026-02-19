@@ -48,6 +48,9 @@ class RemoteClient:
         self.mqtt_client = None
         self.otp = None
         self._lock = threading.Lock()
+        self._continuous_precond_timers: dict = {}  # vin -> threading.Timer or sentinel
+        self._pending_callbacks: dict = {}  # correlation_id -> callback_fn
+        self.get_vehicle_info_fn = None  # set by PSAClient: callable(vin) -> status
         self.update_thread: threading.Timer = None
 
     def __on_mqtt_connect(self, client, userdata, result_code, _):  # pylint: disable=unused-argument
@@ -85,6 +88,10 @@ class RemoteClient:
                         logger.error("Last request might have been send twice without success")
                 elif data["return_code"] != "0":
                     logger.error('%s : %s', data["return_code"], data.get("reason", "?"))
+                corr_id = data.get("correlation_id")
+                if corr_id and corr_id in self._pending_callbacks:
+                    callback = self._pending_callbacks.pop(corr_id)
+                    callback(data.get("return_code", "unknown"), data.get("reason", ""))
             elif msg.topic.startswith(MQTT_EVENT_TOPIC):
                 charge_info = data["charging_state"]
                 programs = data["precond_state"].get("programs", None)
@@ -266,6 +273,130 @@ class RemoteClient:
         logger.info("Preconditioning: %s", msg)
         self.publish(msg)
         return True
+
+    def _preconditioning_send_with_check(self, vin) -> tuple:
+        """Send a preconditioning activate command and wait for the MQTT response.
+        Returns (success: bool, reason: str). Blocks up to 180 seconds for the response."""
+        if vin in self.precond_programs:
+            programs = self.precond_programs[vin]
+        else:
+            programs = DEFAULT_PRECONDITIONING_PROGRAM
+        msg = self.mqtt_request(vin, {"asap": "activate", "programs": programs}, "/ThermalPrecond")
+        self.publish(msg)
+        corr_id = msg.data.get("correlation_id")
+        if not corr_id:
+            logger.warning("No correlation_id in preconditioning request, assuming success")
+            return True, ""
+        event = threading.Event()
+        result = [None]
+
+        def _on_response(return_code, reason):
+            result[0] = (return_code, reason)
+            event.set()
+
+        self._pending_callbacks[corr_id] = _on_response
+        event.wait(timeout=180)
+        if not event.is_set():
+            self._pending_callbacks.pop(corr_id, None)
+            logger.warning("Preconditioning response timeout for %s", vin)
+            return False, "timeout"
+        return_code, reason = result[0]
+        return return_code == "0", reason
+
+    def _is_preconditioning_running(self, vin) -> bool:
+        """Fetch a fresh vehicle status, then check if preconditioning is currently active."""
+        try:
+            if self.get_vehicle_info_fn is not None:
+                self.get_vehicle_info_fn(vin)
+            else:
+                logger.warning("get_vehicle_info_fn not set, using cached status for %s", vin)
+            car = self.vehicles_list.get_car_by_vin(vin)
+            return car.status.preconditionning.air_conditioning.status != "Disabled"
+        except AttributeError:
+            logger.warning("Cannot read preconditioning status for %s", vin)
+            return False
+
+    def continuous_preconditioning(self, vin, activate: bool, check_interval_min: int = 20):
+        """Activate or deactivate continuous preconditioning for a given VIN.
+
+        When active:
+        - Immediately sends activate command (up to 3 attempts, 1 min apart on failure).
+        - If all 3 attempts fail → auto-disables the option.
+        - Every check_interval_min minutes (default 20): reads the car status to verify
+          preconditioning is still running. If not, retries up to 3 times; on total
+          failure auto-disables.
+        """
+        if activate:
+            if vin in self._continuous_precond_timers:
+                logger.info("Continuous preconditioning already active for %s", vin)
+                return True
+            logger.info("Starting continuous preconditioning for %s (check every %d min)",
+                        vin, check_interval_min)
+            # Sentinel so is_continuous_preconditioning_active() returns True immediately
+            self._continuous_precond_timers[vin] = True
+
+            MAX_ATTEMPTS = 3
+
+            def _schedule_check():
+                """Schedule the next status check in check_interval_min minutes."""
+                if vin not in self._continuous_precond_timers:
+                    return
+                timer = threading.Timer(check_interval_min * 60, _check_and_reactivate)
+                timer.daemon = True
+                self._continuous_precond_timers[vin] = timer
+                timer.start()
+
+            def _try_activate(attempt_number):
+                """Try to activate preconditioning; retry immediately after a failed response,
+                up to MAX_ATTEMPTS times. Each attempt waits for the MQTT response (up to 180s)
+                before proceeding."""
+                if vin not in self._continuous_precond_timers:
+                    return
+                logger.info("Preconditioning activate attempt %d/%d for %s",
+                            attempt_number, MAX_ATTEMPTS, vin)
+                success, reason = self._preconditioning_send_with_check(vin)
+                if vin not in self._continuous_precond_timers:
+                    return  # deactivated while waiting for MQTT response
+                if success:
+                    logger.info("Preconditioning activated for %s, next check in %d min",
+                                vin, check_interval_min)
+                    _schedule_check()
+                elif attempt_number < MAX_ATTEMPTS:
+                    logger.warning(
+                        "Preconditioning failed for %s (%s), retrying immediately (attempt %d/%d)",
+                        vin, reason, attempt_number + 1, MAX_ATTEMPTS)
+                    _try_activate(attempt_number + 1)
+                else:
+                    logger.error(
+                        "Continuous preconditioning disabled for %s after %d failed attempts (%s)",
+                        vin, MAX_ATTEMPTS, reason)
+                    self._continuous_precond_timers.pop(vin, None)
+
+            def _check_and_reactivate():
+                """Periodic check: if preconditioning stopped, try to re-activate it."""
+                if vin not in self._continuous_precond_timers:
+                    return
+                if self._is_preconditioning_running(vin):
+                    logger.info("Preconditioning still active for %s, next check in %d min",
+                                vin, check_interval_min)
+                    _schedule_check()
+                else:
+                    logger.info("Preconditioning no longer active for %s, re-activating...", vin)
+                    _try_activate(1)
+
+            attempt_thread = threading.Thread(target=_try_activate, args=[1], daemon=True)
+            attempt_thread.start()
+        else:
+            timer = self._continuous_precond_timers.pop(vin, None)
+            if isinstance(timer, threading.Timer):
+                timer.cancel()
+            if timer is not None:
+                logger.info("Stopped continuous preconditioning for %s", vin)
+            self.preconditioning(vin, False)
+        return True
+
+    def is_continuous_preconditioning_active(self, vin) -> bool:
+        return vin in self._continuous_precond_timers
 
     def load_otp(self, force_new=False):
         otp_session = load_otp()
