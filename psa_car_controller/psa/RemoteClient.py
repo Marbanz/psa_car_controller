@@ -49,7 +49,6 @@ class RemoteClient:
         self.otp = None
         self._lock = threading.Lock()
         self._continuous_precond_timers: dict = {}  # vin -> threading.Timer or sentinel
-        self._pending_callbacks: dict = {}  # correlation_id -> callback_fn
         self.get_vehicle_info_fn = None  # set by PSAClient: callable(vin) -> status
         self.update_thread: threading.Timer = None
 
@@ -88,10 +87,6 @@ class RemoteClient:
                         logger.error("Last request might have been send twice without success")
                 elif data["return_code"] != "0":
                     logger.error('%s : %s', data["return_code"], data.get("reason", "?"))
-                corr_id = data.get("correlation_id")
-                if corr_id and corr_id in self._pending_callbacks:
-                    callback = self._pending_callbacks.pop(corr_id)
-                    callback(data.get("return_code", "unknown"), data.get("reason", ""))
             elif msg.topic.startswith(MQTT_EVENT_TOPIC):
                 charge_info = data["charging_state"]
                 programs = data["precond_state"].get("programs", None)
@@ -275,33 +270,24 @@ class RemoteClient:
         return True
 
     def _preconditioning_send_with_check(self, vin) -> tuple:
-        """Send a preconditioning activate command and wait for the MQTT response.
-        Returns (success: bool, reason: str). Blocks up to 180 seconds for the response."""
+        """Send a preconditioning activate command, wait 60 seconds, then check
+        the actual vehicle status via the REST API to determine success.
+        This mirrors the pattern used by ChargeControl.control_charge_with_ack:
+        MQTT responses for commands are only intermediate acknowledgments and
+        cannot be used to determine the actual result."""
         if vin in self.precond_programs:
             programs = self.precond_programs[vin]
         else:
             programs = DEFAULT_PRECONDITIONING_PROGRAM
         msg = self.mqtt_request(vin, {"asap": "activate", "programs": programs}, "/ThermalPrecond")
+        logger.info("Preconditioning: %s", msg)
         self.publish(msg)
-        corr_id = msg.data.get("correlation_id")
-        if not corr_id:
-            logger.warning("No correlation_id in preconditioning request, assuming success")
+        logger.info("Waiting 60s for preconditioning to take effect on %s...", vin)
+        time.sleep(60)
+        running = self._is_preconditioning_running(vin)
+        if running:
             return True, ""
-        event = threading.Event()
-        result = [None]
-
-        def _on_response(return_code, reason):
-            result[0] = (return_code, reason)
-            event.set()
-
-        self._pending_callbacks[corr_id] = _on_response
-        event.wait(timeout=180)
-        if not event.is_set():
-            self._pending_callbacks.pop(corr_id, None)
-            logger.warning("Preconditioning response timeout for %s", vin)
-            return False, "timeout"
-        return_code, reason = result[0]
-        return return_code == "0", reason
+        return False, "preconditioning not active after 60s"
 
     def _is_preconditioning_running(self, vin) -> bool:
         """Fetch a fresh vehicle status, then check if preconditioning is currently active."""
@@ -363,8 +349,9 @@ class RemoteClient:
                     _schedule_check()
                 elif attempt_number < MAX_ATTEMPTS:
                     logger.warning(
-                        "Preconditioning failed for %s (%s), retrying immediately (attempt %d/%d)",
+                        "Preconditioning failed for %s (%s), waiting 60s before retry (attempt %d/%d)",
                         vin, reason, attempt_number + 1, MAX_ATTEMPTS)
+                    time.sleep(60)
                     _try_activate(attempt_number + 1)
                 else:
                     logger.error(
