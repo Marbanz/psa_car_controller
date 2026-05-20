@@ -69,6 +69,13 @@
   reg: VR7EZZKXZN 
   max_elec_consumption: 70
 - !ElecModel
+  name: e-berlingo 2022+
+  battery_power: 50
+  fuel_capacity: 0
+  abrp_name: Citroen;e-Berlingo;2022+
+  reg: VR7EMZKU5T
+  max_elec_consumption: 70
+- !ElecModel
   name: e-jumpy
   battery_power: 68
   fuel_capacity: 0
@@ -383,6 +390,14 @@
   max_elec_consumption: 70
   max_fuel_consumption: 30
 - !CarModel
+  name: Grandland Electric
+  battery_power: 73
+  fuel_capacity: 0
+  abrp_name: opel:grandland:25:74
+  reg: VXKKCZKZ3T
+  max_elec_consumption: 70
+  max_fuel_consumption: 0
+- !CarModel
   name: C3 Aircross
   battery_power: 0
   fuel_capacity: 45
@@ -572,6 +587,14 @@
   max_elec_consumption: 70
   max_fuel_consumption: 30
 - !CarModel
+  name: 3008 Plug-in Hybrid 195ch
+  battery_power: 17.8
+  fuel_capacity: 55
+  abrp_name:
+  reg: VR3KBDGK9S
+  max_elec_consumption: 70
+  max_fuel_consumption: 30
+- !CarModel
   name: SUV 3008 Hybrid4 300
   battery_power: 13.2
   fuel_capacity: 43
@@ -640,6 +663,14 @@
   fuel_capacity: 40
   abrp_name:
   reg: VR3F4DGYTP 
+  max_elec_consumption: 70
+  max_fuel_consumption: 30
+- !CarModel
+  name: 308 SW PLUG-IN HYBRID (2026) 195 e-DSC7
+  battery_power: 17.2
+  fuel_capacity: 42
+  abrp_name:
+  reg: VR3F4DGM2S 
   max_elec_consumption: 70
   max_fuel_consumption: 30
 - !CarModel
@@ -753,6 +784,13 @@
   reg: VR7CBZYA0R 
   max_elec_consumption: 70
   max_fuel_consumption: 30
+- !ElecModel
+  name: Citroën e-C3 IV
+  battery_power: 44
+  fuel_capacity: 0
+  abrp_name: citroen:ec3:24:44
+  reg: VR7CBZYA9S
+  max_elec_consumption: 70
 - !ElecModel
   name: E-5008 73 kWh
   battery_power: 73
@@ -893,6 +931,14 @@
   reg: VR3FNZKW9R 
   max_elec_consumption: 70
   max_fuel_consumption: 0
+- !ElecModel
+  name: E-308 SW 54kWh
+  battery_power: 50.8
+  fuel_capacity: 0
+  abrp_name: peugeot:e308:23:54
+  reg: VR3FNZKWZR 
+  max_elec_consumption: 70
+  max_fuel_consumption: 0
 - !CarModel
   name: 308 SW GT Hybrid
   battery_power: 12.4
@@ -1002,4 +1048,16 @@
   abrp_name: opel:astrae:22:54:tour
   reg: VXKFNZKW9S 
   max_elec_consumption: 70
-
+- !CarModel
+  name: Berlingo 2018+ Diesel
+  battery_power: 0
+  fuel_capacity: 50
+  abrp_name:
+  reg: VR7ECYHZRK
+- !ElecModel
+  name: e-C5 Comfort Range
+  battery_power: 73
+  fuel_capacity: 0
+  abrp_name: citroen:ec5:25:75:aircross
+  reg: VR7KCZKZ9S 
+  max_elec_consumption: 70
