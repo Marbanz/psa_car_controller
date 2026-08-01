@@ -108,7 +108,7 @@ def get_code(page: Page, scheme: str) -> str:
 
 def get_oauth_code_headless(auth_url: str, email: str, password: str,
                             scheme: str) -> str:
-    """Automate PSA/Stellantis OAuth login using a native Playwright WebKit browser."""
+    """Automate PSA/Stellantis OAuth login using a native Playwright Chromium browser."""
 
     console_logs = []
 
@@ -121,18 +121,18 @@ def get_oauth_code_headless(auth_url: str, email: str, password: str,
     with playwright_sync.sync_playwright() as p:
         # Launch native browser (prefer webkit fallback to chromium)
         browser = None
-        for browser_type in [p.webkit, p.chromium]:
+        for browser_type in [p.chromium]:
             try:
                 logger.info("Launching headless %s", browser_type.name)
                 browser = browser_type.launch(
-                    headless=os.environ.get("NO_HEADLESS") is None)
+                    headless=True)
                 break
             except Exception as exc:  # pylint: disable=broad-except
                 logger.debug("Failed to launch %s: %s", browser_type.name, exc)
 
         if not browser:
             raise PlaywrightNotInstalled("Could not launch any Playwright browser. "
-                                         "Please run 'playwright install --with-deps webkit'")
+                                         "Please run 'playwright install --with-deps chromium'")
 
         context = browser.new_context()
         try:
